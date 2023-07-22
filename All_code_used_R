@@ -1,0 +1,62 @@
+# Packages to use
+library(readr)
+library(tidyverse)
+library(dplyr)
+library(lubridate)
+library(skimr)
+library(janitor)
+library(ggplot2)
+# Combine the 12 months into 1 data frame
+all_months <- bind_rows(january,february,march,april,may,june,july,august,september,october,november,december)
+
+# Make new column for date, ride_length, day_of_week, and month
+all_months$date<- as.Date(all_months$started_at) # need to make a date column because the mutate function doesn't work on characters.
+all_months$month<-format(as.Date(all_months$started_at),"%m")
+all_months<- all_months %>%
+  mutate(ride_length= ended_at- started_at) %>%
+  mutate(day_of_week= weekdays(as.Date(all_months$date)))
+
+# Checking for negative values and duplicates
+all_months <- all_months%>%
+  filter(ride_length > 0) %>%
+  unique()
+
+# Sample data set with 99% confidence level and .5% MOE
+sample<- sample_n(all_months,65398,replace = FALSE)
+
+# Number of rides by rider type
+sample%>% 
+  group_by(member_casual,) %>% 
+  summarise(rides=n()) %>%
+  arrange(member_casual)
+ggplot(aes(x="",y=rides,fill=member_casual))+ geom_col() + coord_polar(theta = "y") 
+
+#Comparing ride_length averages between rider types
+sample %>%
+  group_by(member_casual) %>%
+  summarise(total_ride=n(), average_duration=round(mean(ride_length)),0) %>%
+  arrange(member_casual) %>%
+  ggplot(aes(x=member_casual,y=average_duration,fill= member_casual))+ geom_col(position = "dodge")+ 
+  geom_text(mapping = aes(label=average_duration),size=3.5,vjust=1)
+
+# Comparing number of rides by weekday
+sample$day_of_week<-ordered(sample$day_of_week,levels=c("Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"))
+sample%>% 
+  group_by(member_casual,weekday=day_of_week) %>% 
+  summarise(rides=n()) %>%
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(x=weekday,y=rides,fill=member_casual))+ geom_col(position = "dodge")
+
+#Comparing average duration by weekday
+sample%>% 
+  group_by(member_casual,weekday=day_of_week) %>% 
+  summarise(rides=n(),avg_duration=mean(ride_length)) %>%
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(x=weekday,y=avg_duration,fill=member_casual))+ geom_col(position = "dodge")
+
+# Comparing number of rides by month
+sample%>% 
+  group_by(month,member_casual) %>% 
+  summarise(rides=n(),average_duration=mean(ride_length)) %>%
+  arrange(month,member_casual) %>% 
+  ggplot(aes(x=month,y=rides,fill=member_casual))+ geom_col(position = "dodge")
